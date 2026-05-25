@@ -8,10 +8,12 @@ from fastapi.middleware.cors import (
 )
 
 from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
 
 import redis
 import psycopg2
 import json
+import time
 
 app = FastAPI()
 
@@ -24,11 +26,29 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-producer = KafkaProducer(
-    bootstrap_servers='kafka:9092',
-    value_serializer=lambda v:
-        json.dumps(v).encode()
-)
+producer = None
+
+@app.on_event("startup")
+def startup_event():
+    global producer
+    retries = 30
+    for i in range(retries):
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers='kafka:9092',
+                value_serializer=lambda v: json.dumps(v).encode()
+            )
+            print("Successfully connected to Kafka")
+            break
+        except NoBrokersAvailable:
+            print(f"Waiting for Kafka to be ready... ({i+1}/{retries})")
+            time.sleep(2)
+        except Exception as e:
+            print(f"Error connecting to Kafka: {e}")
+            time.sleep(2)
+    
+    if not producer:
+        print("Warning: Could not connect to Kafka on startup. Will retry on first request.")
 
 redis_client = redis.Redis(
     host='redis',
@@ -56,6 +76,19 @@ async def register(
             status_code=400,
             detail="Course is full"
         )
+        
+    global producer
+    if producer is None:
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers='kafka:9092',
+                value_serializer=lambda v: json.dumps(v).encode()
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to connect to Kafka: {e}"
+            )
 
     producer.send(
         "registrations",

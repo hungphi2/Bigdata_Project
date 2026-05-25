@@ -3,14 +3,14 @@
 ## Bước 1: Khởi động toàn bộ hệ thống
 Sử dụng Docker Compose để build và chạy tất cả các dịch vụ (API, Frontend, Spark, Kafka, Zookeeper, Redis, Postgres):
 ```bash
-docker-compose up --build -d
+docker compose up --build -d
 ```
 *(Đợi khoảng 15-30 giây để tất cả các container, đặc biệt là Kafka và Spark, boot lên hoàn toàn).*
 
 ## Bước 2: Khởi tạo dữ liệu Redis (Set quota cho khóa học)
 Chạy script khởi tạo Redis đã được copy sẵn vào bên trong container `spark` để set số lượng slot giả lập:
 ```bash
-docker-compose exec spark python /opt/bitnami/spark/init_redis.py
+docker compose exec spark python3 /opt/spark/init_redis.py
 ```
 *(Script này sẽ setup các key như `course:CS101:quota` với số lượng giới hạn nhằm chặn overbooking).*
 
@@ -32,12 +32,12 @@ Sau khi load test chạy xong (hoặc đang chạy), vào container PostgreSQL k
 
 Kiểm tra số lượng đăng ký thực tế của từng môn:
 ```bash
-docker-compose exec postgres psql -U admin -d registration -c "SELECT course_id, COUNT(*) FROM registrations GROUP BY course_id;"
+docker compose exec postgres psql -U admin -d registration -c "SELECT course_id, COUNT(1) FROM registrations GROUP BY course_id;"
 ```
 
 Xem chi tiết 10 đăng ký gần nhất:
 ```bash
-docker-compose exec postgres psql -U admin -d registration -c "SELECT * FROM registrations ORDER BY registered_at DESC LIMIT 10;"
+docker compose exec postgres psql -U admin -d registration -c "SELECT * FROM registrations ORDER BY registered_at DESC LIMIT 10;"
 ```
 
 ## 📌 Các Bước Demo Hệ Thống Khuyến Nghị:

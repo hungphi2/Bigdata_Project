@@ -10,6 +10,7 @@ from pyspark.sql.types import (
 
 import redis
 import psycopg2
+import time
 
 spark = (
     SparkSession.builder
@@ -35,19 +36,21 @@ schema = (
     )
 )
 
-df = (
-    spark.readStream
-    .format("kafka")
-    .option(
-        "kafka.bootstrap.servers",
-        "kafka:9092"
-    )
-    .option(
-        "subscribe",
-        "registrations"
-    )
-    .load()
-)
+df = None
+while True:
+    try:
+        df = (
+            spark.readStream
+            .format("kafka")
+            .option("kafka.bootstrap.servers", "kafka:9092")
+            .option("subscribe", "registrations")
+            .load()
+        )
+        print("Successfully connected to Kafka topic 'registrations'")
+        break
+    except Exception as e:
+        print(f"Waiting for Kafka topic 'registrations' to be available... {e}")
+        time.sleep(5)
 
 parsed = (
     df.select(
@@ -129,12 +132,18 @@ def process_batch(
     cur.close()
     conn.close()
 
-parsed.writeStream \
-    .foreachBatch(
-        process_batch
-    ) \
-    .outputMode(
-        "append"
-    ) \
-    .start() \
-    .awaitTermination()
+while True:
+    try:
+        query = parsed.writeStream \
+            .foreachBatch(
+                process_batch
+            ) \
+            .outputMode(
+                "append"
+            ) \
+            .start()
+            
+        query.awaitTermination()
+    except Exception as e:
+        print(f"Streaming query failed: {e}. Restarting in 5 seconds...")
+        time.sleep(5)
