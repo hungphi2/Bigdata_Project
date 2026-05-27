@@ -9,9 +9,10 @@ from fastapi.middleware.cors import (
 
 from kafka import KafkaProducer
 from kafka.errors import NoBrokersAvailable
+from psycopg2 import pool as pg_pool
+from contextlib import contextmanager
 
 import redis
-import psycopg2
 import json
 import time
 
@@ -26,7 +27,8 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-producer = None
+producer  = None
+_db_pool: pg_pool.ThreadedConnectionPool = None
 
 redis_client = redis.Redis(
     host='redis',
@@ -34,14 +36,22 @@ redis_client = redis.Redis(
     decode_responses=True
 )
 
+_DB_KWARGS = dict(
+    host='postgres',
+    database='registration',
+    user='admin',
+    password='secret'
+)
 
+
+@contextmanager
 def _get_db_conn():
-    return psycopg2.connect(
-        host='postgres',
-        database='registration',
-        user='admin',
-        password='secret'
-    )
+    """Borrow a connection from the pool and return it automatically."""
+    conn = _db_pool.getconn()
+    try:
+        yield conn
+    finally:
+        _db_pool.putconn(conn)
 
 
 def seed_redis_from_postgres() -> int:
@@ -54,52 +64,50 @@ def seed_redis_from_postgres() -> int:
     retries = 10
     for attempt in range(retries):
         try:
-            conn = _get_db_conn()
-            cur = conn.cursor()
+            with _get_db_conn() as conn:
+                cur = conn.cursor()
 
-            cur.execute("SELECT course_id, remaining FROM course_quota")
-            courses = cur.fetchall()
+                cur.execute("SELECT course_id, remaining FROM course_quota")
+                courses = cur.fetchall()
 
-            if not courses:
+                if not courses:
+                    cur.close()
+                    print("Warning: course_quota table is empty – nothing to seed")
+                    return 0
+
+                pipe = redis_client.pipeline()
+                for course_id, remaining in courses:
+                    pipe.set(f"quota:{course_id}", remaining)
+                pipe.execute()
+
+                print(f"Redis empty -> seeding courses...")
+                for course_id, remaining in courses:
+                    print(f"  [SEED] quota:{course_id} = {remaining}")
+                print(f"Loaded {len(courses)} courses into Redis")
+
+                # Restore metrics counters so the admin dashboard stays accurate.
+                cur.execute(
+                    """
+                    SELECT
+                        COUNT(*)                                     AS total,
+                        COUNT(*) FILTER (WHERE status = 'success')  AS successful,
+                        COUNT(*) FILTER (WHERE status = 'failed')   AS failed
+                    FROM registration_events
+                    """
+                )
+                total, successful, failed = cur.fetchone()
+                redis_client.mset({
+                    "metrics:total":      total,
+                    "metrics:successful": successful,
+                    "metrics:failed":     failed,
+                })
+                print(
+                    f"  [SEED] metrics restored:"
+                    f" total={total} successful={successful} failed={failed}"
+                )
+
                 cur.close()
-                conn.close()
-                print("Warning: course_quota table is empty – nothing to seed")
-                return 0
-
-            pipe = redis_client.pipeline()
-            for course_id, remaining in courses:
-                pipe.set(f"quota:{course_id}", remaining)
-            pipe.execute()
-
-            print(f"Redis empty -> seeding courses...")
-            for course_id, remaining in courses:
-                print(f"  [SEED] quota:{course_id} = {remaining}")
-            print(f"Loaded {len(courses)} courses into Redis")
-
-            # Restore metrics counters so the admin dashboard stays accurate.
-            cur.execute(
-                """
-                SELECT
-                    COUNT(*)                                     AS total,
-                    COUNT(*) FILTER (WHERE status = 'success')  AS successful,
-                    COUNT(*) FILTER (WHERE status = 'failed')   AS failed
-                FROM registration_events
-                """
-            )
-            total, successful, failed = cur.fetchone()
-            redis_client.mset({
-                "metrics:total":      total,
-                "metrics:successful": successful,
-                "metrics:failed":     failed,
-            })
-            print(
-                f"  [SEED] metrics restored:"
-                f" total={total} successful={successful} failed={failed}"
-            )
-
-            cur.close()
-            conn.close()
-            return len(courses)
+                return len(courses)
 
         except Exception as e:
             print(
@@ -113,9 +121,27 @@ def seed_redis_from_postgres() -> int:
 
 @app.on_event("startup")
 def startup_event():
-    global producer
-    retries = 30
-    for i in range(retries):
+    global producer, _db_pool
+
+    # 1. Initialize DB connection pool (waits for Postgres to be ready)
+    for i in range(30):
+        try:
+            _db_pool = pg_pool.ThreadedConnectionPool(
+                minconn=2,
+                maxconn=3,   # 8 workers × 3 = 24 total connections max
+                **_DB_KWARGS
+            )
+            print("DB connection pool initialized (min=2 max=5)")
+            break
+        except Exception as e:
+            print(f"Waiting for Postgres... ({i+1}/30): {e}")
+            time.sleep(2)
+
+    if _db_pool is None:
+        print("Warning: Could not initialize DB pool. Will retry on first request.")
+
+    # 2. Connect to Kafka
+    for i in range(30):
         try:
             producer = KafkaProducer(
                 bootstrap_servers='kafka:9092',
@@ -124,7 +150,7 @@ def startup_event():
             print("Successfully connected to Kafka")
             break
         except NoBrokersAvailable:
-            print(f"Waiting for Kafka to be ready... ({i+1}/{retries})")
+            print(f"Waiting for Kafka to be ready... ({i+1}/30)")
             time.sleep(2)
         except Exception as e:
             print(f"Error connecting to Kafka: {e}")
@@ -133,7 +159,7 @@ def startup_event():
     if not producer:
         print("Warning: Could not connect to Kafka on startup. Will retry on first request.")
 
-    # Auto-seed Redis if it's empty (e.g. after a container restart).
+    # 3. Auto-seed Redis if it's empty (e.g. after a container restart).
     existing = redis_client.keys("quota:*")
     if not existing:
         seed_redis_from_postgres()
@@ -144,18 +170,17 @@ def startup_event():
 def _log_failed_event(student_id: str, course_id: str, reason: str):
     """Insert a failed registration event into registration_events."""
     try:
-        conn = _get_db_conn()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO registration_events (student_id, course_id, status, reason)
-            VALUES (%s, %s, 'failed', %s)
-            """,
-            (student_id, course_id, reason)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+        with _get_db_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO registration_events (student_id, course_id, status, reason)
+                VALUES (%s, %s, 'failed', %s)
+                """,
+                (student_id, course_id, reason)
+            )
+            conn.commit()
+            cur.close()
     except Exception as e:
         print(f"Warning: could not log failed event: {e}")
 
@@ -228,48 +253,40 @@ async def check_registration(
     student_id: str,
     course_id: str
 ):
-    conn = _get_db_conn()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT EXISTS(
-            SELECT 1
-            FROM registrations
-            WHERE student_id=%s
-            AND course_id=%s
+    with _get_db_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT EXISTS(
+                SELECT 1
+                FROM registrations
+                WHERE student_id=%s
+                AND course_id=%s
+            )
+            """,
+            (student_id, course_id)
         )
-        """,
-        (student_id, course_id)
-    )
-
-    exists = cur.fetchone()[0]
-
-    cur.close()
-    conn.close()
+        exists = cur.fetchone()[0]
+        cur.close()
 
     return {"registered": exists}
 
 
 @app.get("/events")
 async def get_events(limit: int = 20):
-    conn = _get_db_conn()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT student_id, course_id, status, reason, created_at
-        FROM registration_events
-        ORDER BY created_at DESC
-        LIMIT %s
-        """,
-        (limit,)
-    )
-
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
+    with _get_db_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT student_id, course_id, status, reason, created_at
+            FROM registration_events
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (limit,)
+        )
+        rows = cur.fetchall()
+        cur.close()
 
     return [
         {
@@ -286,24 +303,20 @@ async def get_events(limit: int = 20):
 
 @app.get("/metrics")
 async def get_metrics():
-    conn = _get_db_conn()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT
-            COUNT(*)                                      AS total,
-            COUNT(*) FILTER (WHERE status = 'success')   AS successful,
-            COUNT(*) FILTER (WHERE status = 'failed')    AS failed
-        FROM registration_events
-        """
-    )
-
-    row = cur.fetchone()
-    total, successful, failed = row[0], row[1], row[2]
-
-    cur.close()
-    conn.close()
+    with _get_db_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                COUNT(*)                                      AS total,
+                COUNT(*) FILTER (WHERE status = 'success')   AS successful,
+                COUNT(*) FILTER (WHERE status = 'failed')    AS failed
+            FROM registration_events
+            """
+        )
+        row = cur.fetchone()
+        total, successful, failed = row[0], row[1], row[2]
+        cur.close()
 
     courses = await get_courses()
     total_quota_left = sum(c["remaining"] for c in courses)
@@ -318,20 +331,19 @@ async def get_metrics():
 
 @app.get("/courses")
 async def get_courses():
-    conn = _get_db_conn()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT
-            course_id,
-            total_quota,
-            remaining
-        FROM course_quota
-        """
-    )
-
-    rows = cur.fetchall()
+    with _get_db_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                course_id,
+                total_quota,
+                remaining
+            FROM course_quota
+            """
+        )
+        rows = cur.fetchall()
+        cur.close()
 
     courses = []
 
@@ -348,8 +360,5 @@ async def get_courses():
             "total_quota": row[1],
             "remaining": safe_remaining
         })
-
-    cur.close()
-    conn.close()
 
     return courses

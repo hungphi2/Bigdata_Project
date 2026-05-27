@@ -240,6 +240,36 @@ Dừng theo dõi log: `Ctrl + C`
 
 ---
 
+## Reset Dữ Liệu Để Chạy Lại Test
+
+Sau khi chạy load test, toàn bộ quota sẽ về 0. Thực hiện **đủ 3 bước** sau để reset sạch và chạy lại:
+
+### Bước 1 — Reset quota và xóa dữ liệu cũ trong PostgreSQL
+
+```bash
+docker compose exec postgres psql -U admin -d registration -c "
+UPDATE course_quota SET remaining = total_quota;
+TRUNCATE registration_events;
+TRUNCATE registrations;
+"
+```
+
+Lệnh này:
+- Khôi phục `remaining` về đúng giá trị `total_quota` ban đầu cho từng môn
+- Xóa toàn bộ lịch sử event và đăng ký cũ
+
+### Bước 2 — Đồng bộ lại quota từ PostgreSQL vào Redis
+
+```bash
+docker compose exec spark python3 /opt/spark/init_redis.py
+```
+
+Sau bước này, `quota:CS101 … quota:CS111` và các metrics counter trong Redis sẽ được khôi phục, hệ thống sẵn sàng nhận request mới.
+
+> **Lưu ý:** Không cần restart container, hệ thống tiếp tục chạy bình thường sau khi reset.
+
+---
+
 ## Dừng Hệ Thống
 
 Dừng tất cả container nhưng **giữ lại dữ liệu** (volume PostgreSQL):
