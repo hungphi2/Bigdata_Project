@@ -1,0 +1,807 @@
+/* Global Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap');
+
+/* Reset */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ===================================================
+   ROLE SELECTION PAGE
+   =================================================== */
+.role-selection-page {
+  background-color: var(--bg-dark);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background-color var(--transition-normal);
+}
+
+.role-selection-toggle {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+}
+
+.role-selection-title {
+  color: var(--text-main);
+  font-size: 2.5rem;
+}
+
+.role-selection-subtitle {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.role-card {
+  background-color: var(--role-card-bg);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+  border: 2px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.role-card--student {
+  border-color: rgba(59, 130, 246, 0.30);
+  border-left: 4px solid var(--primary);
+}
+
+.role-card--admin {
+  border-color: rgba(168, 85, 247, 0.30);
+  border-left: 4px solid #a855f7;
+}
+
+.role-card--student:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.20);
+  border-color: rgba(59, 130, 246, 0.60);
+}
+
+.role-card--admin:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(168, 85, 247, 0.20);
+  border-color: rgba(168, 85, 247, 0.60);
+}
+
+.role-card-icon-wrap {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+}
+
+.role-card-icon-wrap--student {
+  background-color: rgba(59, 130, 246, 0.20);
+  color: var(--primary);
+}
+
+.role-card-icon-wrap--admin {
+  background-color: rgba(168, 85, 247, 0.20);
+  color: #a855f7;
+}
+
+.role-card-heading {
+  color: var(--text-main);
+  font-size: 1.5rem;
+}
+
+.role-card-desc {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  opacity: 0.85;
+}
+
+.role-card-btn {
+  width: 100%;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast);
+  color: #ffffff;
+}
+
+.role-card-btn--student {
+  background-color: var(--primary);
+}
+
+.role-card-btn--admin {
+  background-color: #a855f7;
+}
+
+.role-card-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* ===================================================
+   TYPOGRAPHY SCALE
+   =================================================== */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); }
+h2 { font-size: clamp(1.25rem, 3vw, 1.75rem); }
+h3 { font-size: 1.25rem; }
+h5 { font-size: 1.0625rem; }
+h6 { font-size: 0.9375rem; }
+
+small, .small { font-size: 0.8125rem; }
+
+/* ===================================================
+   INNER CARD  (nested card inside admin-card-wrapper /
+   student-card-wrapper — used by RegisterForm,
+   RegistrationHistory, ActivityFeed)
+   =================================================== */
+.inner-card {
+  background-color: var(--card-inner-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.inner-card-header {
+  background-color: var(--card-header-bg);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+.inner-card-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+.inner-card-body {
+  padding: 1.25rem;
+  flex: 1;
+}
+
+/* ===================================================
+   FORM FIELDS  (shared by both admin and student pages)
+   =================================================== */
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 1.125rem;
+}
+
+.field-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Override Bootstrap form controls — works on both pages */
+.form-control,
+.form-select {
+  background-color: var(--form-input-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--form-input-border) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 0.625rem 0.875rem !important;
+  font-size: 0.9rem !important;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+  line-height: 1.5 !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary) !important;
+  background-color: var(--form-input-bg-focus) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+  color: var(--text-main) !important;
+  outline: none !important;
+}
+
+.form-control::placeholder {
+  color: var(--form-input-placeholder) !important;
+  opacity: 1 !important;
+}
+
+/* Submit button */
+.themed-submit-btn {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.themed-submit-btn:not(:disabled) {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+.themed-submit-btn:not(:disabled):hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px var(--card-shadow);
+}
+
+.themed-submit-btn:disabled {
+  background-color: var(--border-light);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+/* ===================================================
+   STAT CARDS  (admin dashboard metrics)
+   =================================================== */
+.stat-card {
+  background-color: var(--card-dark);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stat-card:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0 0 0.35rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.stat-value--success { color: var(--success); }
+.stat-value--danger  { color: var(--danger); }
+.stat-value--warning { color: var(--warning); }
+
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-icon--primary { background-color: rgba(59, 130, 246, 0.12); color: var(--primary); }
+.stat-icon--success { background-color: rgba(34, 197, 94,  0.12); color: var(--success); }
+.stat-icon--danger  { background-color: rgba(239, 68,  68,  0.12); color: var(--danger); }
+.stat-icon--warning { background-color: rgba(245, 158, 11,  0.12); color: var(--warning); }
+
+/* ===================================================
+   COURSE CARD  (shared student/admin CourseCard.jsx)
+   =================================================== */
+.course-card {
+  background-color: var(--card-dark);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  height: 100%;
+  cursor: pointer;
+  transition: transform var(--transition-normal),
+              box-shadow var(--transition-normal),
+              border-color var(--transition-normal);
+}
+
+.course-card.full {
+  border-left-color: var(--danger);
+}
+
+.course-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--card-hover-border);
+  border-left-color: var(--primary);
+}
+
+.course-card.full:hover {
+  border-left-color: var(--danger);
+}
+
+.course-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.course-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.course-card__title h5 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
+}
+
+.course-card__desc {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.course-card__stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.course-card__stat-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.course-card__stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.course-card__stat-value {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.course-card__remaining {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.course-card__capacity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.375rem;
+}
+
+.course-card__capacity-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.course-card__capacity-pct {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.course-card__progress-track {
+  height: 6px;
+  background-color: var(--border-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.course-card__progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease-in-out;
+}
+
+.course-card__btn {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: filter var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  margin-top: auto;
+}
+
+.course-card__btn:not(:disabled) {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+.course-card__btn:not(:disabled):hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--card-shadow);
+}
+
+.course-card__btn:disabled {
+  background-color: var(--border-light);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* ===================================================
+   ACTIVITY TERMINAL  (ActivityFeed.jsx)
+   =================================================== */
+.activity-header {
+  background-color: var(--card-header-bg);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.625rem 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.activity-header-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.activity-terminal {
+  background-color: var(--terminal-bg);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: 0.75rem;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 0.78rem;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 200px;
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.activity-row:last-child {
+  border-bottom: none;
+}
+
+.activity-time {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  opacity: 0.65;
+  flex-shrink: 0;
+  min-width: 58px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-student {
+  color: var(--text-code);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.activity-sep {
+  color: var(--text-muted);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.activity-course {
+  color: var(--warning);
+  font-weight: 700;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-ok  {
+  color: var(--success);
+  font-weight: 700;
+  font-size: 0.7rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.activity-err {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 0.7rem;
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  cursor: default;
+}
+
+.activity-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  gap: 0.5rem;
+  opacity: 0.45;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* ===================================================
+   PIPELINE NODES  (PipelineViz.jsx)
+   =================================================== */
+.pipeline-wrap {
+  display: flex;
+  overflow-x: auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 0.25rem;
+}
+
+.pipeline-wrap::-webkit-scrollbar { height: 4px; }
+.pipeline-wrap::-webkit-scrollbar-track { background: transparent; }
+.pipeline-wrap::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 2px;
+}
+
+.pipeline-node {
+  background-color: var(--card-dark);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.pipeline-node:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px var(--card-shadow);
+}
+
+.pipeline-node-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.pipeline-status {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--success);
+  box-shadow: 0 0 5px var(--success);
+  flex-shrink: 0;
+}
+
+.pipeline-arrow {
+  color: var(--text-muted);
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+/* ===================================================
+   SKELETON / SHIMMER LOADING
+   =================================================== */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border-subtle) 25%,
+    var(--border-light)  50%,
+    var(--border-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  display: block;
+  border-radius: 4px;
+}
+
+/* ===================================================
+   EMPTY STATE
+   =================================================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.375rem;
+  color: var(--text-muted);
+  padding: 2rem 1rem;
+}
+
+.empty-state--sm {
+  padding: 1.25rem 0.75rem;
+  min-height: 130px;
+}
+
+.empty-state--md {
+  min-height: 180px;
+}
+
+.empty-state-icon {
+  opacity: 0.4;
+  margin-bottom: 0.375rem;
+}
+
+.empty-state-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+  opacity: 0.7;
+}
+
+.empty-state-desc {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin: 0;
+  opacity: 0.8;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+.empty-state-action {
+  margin-top: 0.625rem;
+  padding: 0.45rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: rgba(59, 130, 246, 0.09);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.empty-state-action:hover {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.40);
+}
+
+/* ===================================================
+   PAGE SPINNER
+   =================================================== */
+.loading-page-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner-ring {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+.loading-spinner-text {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}

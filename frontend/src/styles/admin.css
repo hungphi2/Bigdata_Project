@@ -1,0 +1,541 @@
+/* ===== ADMIN DASHBOARD LAYOUT ===== */
+
+.admin-page {
+  background-color: var(--bg-dark);
+  min-height: 100vh;
+  color: var(--text-main);
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+.admin-main-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+/* Sections with consistent spacing */
+.admin-section {
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.admin-section:last-child {
+  margin-bottom: 0;
+}
+
+.metrics-section {
+  background-color: transparent;
+  padding: 2rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.content-section {
+  background-color: transparent;
+  padding: 2rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.courses-section {
+  background-color: transparent;
+  padding: 2rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.pipeline-section {
+  background-color: transparent;
+  padding: 2rem;
+}
+
+/* Card wrapper for consistent styling */
+.admin-card-wrapper {
+  background-color: var(--card-dark);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: var(--radius-md);
+  padding: 2rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  backdrop-filter: blur(10px);
+  transition: all var(--transition-normal);
+}
+
+.admin-card-wrapper:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: 0 8px 16px var(--card-shadow);
+}
+
+/* Section titles */
+.admin-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 0.125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  letter-spacing: -0.01em;
+}
+
+/* ===== ADMIN HEADER BAR ===== */
+
+.admin-header-bar {
+  border-bottom: 2px solid var(--header-border);
+}
+
+.admin-header-icon-wrap {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--primary);
+}
+
+.admin-service-badge {
+  border: 1px solid var(--badge-border) !important;
+  background-color: var(--card-dark) !important;
+  color: var(--text-muted) !important;
+}
+
+/* Legacy .admin-header kept for size/spacing references in responsive blocks */
+.admin-header {
+  border-bottom: 2px solid var(--header-border);
+  padding: 3rem 2rem;
+  margin-bottom: 2rem;
+  background: var(--header-gradient);
+}
+
+.admin-header h2 {
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-main);
+}
+
+.admin-header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(59, 130, 246, 0.15);
+  margin-right: 1rem;
+  color: var(--primary);
+  font-size: 1.5rem;
+}
+
+.admin-header-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin: 0;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+/* ===== DASHBOARD METRICS CARDS ===== */
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.dashboard-card {
+  background: var(--card-dark);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: var(--radius-md);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: all var(--transition-normal);
+  backdrop-filter: blur(10px);
+}
+
+.dashboard-card:hover {
+  border-color: var(--card-hover-border);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px var(--card-shadow);
+}
+
+.dashboard-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dashboard-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  background-color: rgba(59, 130, 246, 0.10);
+  color: var(--primary);
+}
+
+.dashboard-card-title {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.dashboard-card-value {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+  letter-spacing: -0.5px;
+}
+
+.dashboard-card-change {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dashboard-card-change.positive {
+  color: var(--success);
+}
+
+.dashboard-card-change.negative {
+  color: var(--danger);
+}
+
+/* ===== ACTIVITY FEED ===== */
+
+.activity-feed {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  padding: 0;
+  height: 100%;
+}
+
+.activity-feed-header {
+  padding: 0;
+  border-bottom: none;
+  background-color: transparent;
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.activity-feed-header h6 {
+  font-weight: 700;
+  margin: 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-main);
+}
+
+.activity-feed-body {
+  padding: 0;
+  overflow-y: auto;
+  flex-grow: 1;
+  min-height: 200px;
+  max-height: 400px;
+}
+
+.activity-feed-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.activity-feed-body::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.30);
+  border-radius: 3px;
+}
+
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0.75rem 0;
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.activity-item:hover {
+  background-color: var(--hover-overlay);
+  padding: 0.75rem 0.5rem;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-item-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  overflow: hidden;
+  flex: 1;
+}
+
+.activity-item-time {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  margin-right: 0.5rem;
+}
+
+.activity-item-course {
+  color: var(--primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  min-width: 60px;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-item-status {
+  font-weight: 700;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.activity-item-status.success {
+  color: var(--success);
+}
+
+.activity-item-status.error {
+  color: var(--danger);
+}
+
+/* ===== PIPELINE VISUALIZATION ===== */
+
+.pipeline-container {
+  display: flex;
+  overflow-x: auto;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  align-items: center;
+}
+
+.pipeline-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.pipeline-container::-webkit-scrollbar-track {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+.pipeline-container::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.30);
+  border-radius: 3px;
+}
+
+.data-pipeline-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--card-dark);
+  border-radius: var(--radius-md);
+  min-width: 150px;
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  transition: all var(--transition-normal);
+  text-align: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.data-pipeline-node:hover {
+  transform: translateY(-4px);
+  border-color: var(--card-hover-border);
+  box-shadow: 0 8px 16px var(--card-shadow);
+}
+
+.data-pipeline-node-icon {
+  font-size: 2.5rem;
+  color: var(--primary);
+}
+
+.data-pipeline-node-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.data-pipeline-node-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.pipeline-connector {
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  opacity: 0.4;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+@media (max-width: 1200px) {
+  .admin-main-container {
+    padding: 0;
+  }
+
+  .admin-section {
+    padding: 1.5rem;
+  }
+
+  .admin-card-wrapper {
+    padding: 1.5rem;
+  }
+
+  .dashboard-cards {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .dashboard-card {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-header {
+    padding: 2rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .admin-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .admin-section {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .admin-card-wrapper {
+    padding: 1.25rem;
+  }
+
+  .admin-section-title {
+    font-size: 1.1rem;
+  }
+
+  .dashboard-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+
+  .dashboard-card {
+    padding: 1.25rem;
+  }
+
+  .dashboard-card-value {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-card-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+
+  .pipeline-container {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .data-pipeline-node {
+    min-width: 130px;
+    padding: 1.25rem;
+  }
+
+  .data-pipeline-node-icon {
+    font-size: 2rem;
+  }
+
+  .data-pipeline-node-value {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .admin-header {
+    padding: 1.5rem 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .admin-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .admin-section {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .admin-card-wrapper {
+    padding: 1rem;
+  }
+
+  .dashboard-cards {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .dashboard-card {
+    padding: 1rem;
+  }
+
+  .dashboard-card-value {
+    font-size: 1.25rem;
+  }
+
+  .activity-feed-body {
+    max-height: 300px;
+  }
+
+  .data-pipeline-node {
+    min-width: 110px;
+    padding: 1rem;
+    font-size: 0.8rem;
+  }
+
+  .data-pipeline-node-icon {
+    font-size: 1.5rem;
+  }
+
+  .data-pipeline-node-value {
+    font-size: 1rem;
+  }
+}

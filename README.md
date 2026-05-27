@@ -1,49 +1,191 @@
-# Hướng Dẫn Chạy & Kiểm Thử Hệ Thống (High-Concurrency Registration)
+# Hệ Thống Đăng Ký Học Phần Chịu Tải Cao
 
-## Bước 1: Khởi động toàn bộ hệ thống
-Sử dụng Docker Compose để build và chạy tất cả các dịch vụ (API, Frontend, Spark, Kafka, Zookeeper, Redis, Postgres):
-```bash
-docker compose up --build -d
+> **Kafka + Spark Streaming + Redis · Đồ án Big Data**
+
+Hệ thống mô phỏng bài toán thực tế tại các trường đại học: hàng nghìn sinh viên tranh nhau đăng ký học phần cùng một lúc. Thay vì ghi thẳng vào cơ sở dữ liệu và gây nghẽn, hệ thống áp dụng kiến trúc **Event-Driven + Streaming** để dàn đều tải, phản hồi tức thì và đảm bảo tính toàn vẹn dữ liệu tuyệt đối.
+
+---
+
+## Mục Tiêu
+
+| # | Mục tiêu | Chi tiết |
+|---|----------|----------|
+| 1 | **Chịu tải cao** | Xử lý hàng nghìn request đồng thời mà không sập |
+| 2 | **Không trùng đăng ký** | Một sinh viên chỉ được đăng ký một môn một lần |
+| 3 | **Không vượt chỉ tiêu** | Đúng N sinh viên được nhận, người thứ N+1 bị từ chối |
+| 4 | **Xử lý race condition** | Atomic counter trên Redis ngăn overbooking khi nhiều request đến cùng lúc |
+| 5 | **Phản hồi nhanh** | API trả kết quả ngay lập tức, Spark xử lý nền không block người dùng |
+
+---
+
+## Kiến Trúc Tổng Thể
+
 ```
-*(Đợi khoảng 15-30 giây để tất cả các container, đặc biệt là Kafka và Spark, boot lên hoàn toàn).*
-
-## Bước 2: Khởi tạo dữ liệu Redis (Set quota cho khóa học)
-Chạy script khởi tạo Redis đã được copy sẵn vào bên trong container `spark` để set số lượng slot giả lập:
-```bash
-docker compose exec spark python3 /opt/spark/init_redis.py
-```
-*(Script này sẽ setup các key như `course:CS101:quota` với số lượng giới hạn nhằm chặn overbooking).*
-
-## Bước 3: Truy cập các giao diện kiểm tra
-- **Frontend (React)**: Truy cập http://localhost:3000
-- **FastAPI Document (Swagger UI)**: Truy cập http://localhost:8000/docs
-- Có thể dùng Swagger UI để test thủ công 1 request đăng ký trước khi load test.
-
-## Bước 4: Chạy Load Test (Mô phỏng 5000 request)
-Ở môi trường máy host (máy ngoài), đảm bảo bạn đã cài module `requests`, sau đó chạy script giả lập:
-```bash
-pip install requests
-python load_test/simulate.py
-```
-*(Script này dùng ThreadPoolExecutor để bắn 5000 requests đồng thời tới `/register`, mô phỏng hiện tượng race condition cạnh tranh tranh giành slot môn học).*
-
-## Bước 5: Verify (Xác thực dữ liệu trong Database)
-Sau khi load test chạy xong (hoặc đang chạy), vào container PostgreSQL kiểm tra kết quả ghi nhận cuối cùng để xác minh xem có bị lố số lượng (overbooking) hoặc trùng lặp (duplicates) không.
-
-Kiểm tra số lượng đăng ký thực tế của từng môn:
-```bash
-docker compose exec postgres psql -U admin -d registration -c "SELECT course_id, COUNT(1) FROM registrations GROUP BY course_id;"
+┌──────────┐   HTTP POST    ┌───────────┐   Produce   ┌──────────────────────┐
+│          │ ─────────────► │           │ ───────────► │  Kafka               │
+│  React   │                │  FastAPI  │              │  topic: registrations│
+│ Frontend │ ◄───────────── │  Backend  │              └──────────┬───────────┘
+│ (Port    │  "Đã ghi nhận" │ (Port     │                         │ Consume
+│  3000)   │                │  8000)    │                         ▼
+└──────────┘                │           │   Check     ┌──────────────────────┐
+                            │           │ ──────────► │  Redis               │
+                            └───────────┘   Quota     │  quota:<course_id>   │
+                                  ▲                   └──────────┬───────────┘
+                                  │ GET /check                   │ DECR (atomic)
+                                  │                              ▼
+                            ┌─────┴─────┐  INSERT    ┌──────────────────────┐
+                            │           │ ──────────► │  Apache Spark        │
+                            │ PostgreSQL│             │  Structured Streaming│
+                            │  (Port    │ ◄────────── │  (job.py)            │
+                            │   5432)   │   Persist   └──────────────────────┘
+                            └───────────┘
 ```
 
-Xem chi tiết 10 đăng ký gần nhất:
-```bash
-docker compose exec postgres psql -U admin -d registration -c "SELECT * FROM registrations ORDER BY registered_at DESC LIMIT 10;"
+### Luồng xử lý chính
+
+```
+[1] Sinh viên bấm "Đăng ký"
+        │
+        ▼
+[2] FastAPI kiểm tra Redis quota (nhanh, in-memory)
+    ├─ Hết chỗ → Trả lỗi ngay
+    └─ Còn chỗ → Đẩy event vào Kafka → Trả "Đã ghi nhận"
+        │
+        ▼
+[3] Spark Streaming tiêu thụ event từ Kafka
+    ├─ DECR quota trên Redis (atomic, thread-safe)
+    │   ├─ remaining >= 0 → INSERT vào PostgreSQL
+    │   │   └─ Trùng (IntegrityError) → INCR Redis (hoàn slot)
+    │   └─ remaining < 0  → INCR Redis (hoàn slot), bỏ qua
+        │
+        ▼
+[4] Frontend gọi GET /check → API truy vấn PostgreSQL
+    → Hiển thị kết quả chính xác cuối cùng
 ```
 
-## 📌 Các Bước Demo Hệ Thống Khuyến Nghị:
-1. **Show trạng thái rỗng:** Truy cập Frontend (http://localhost:3000) show các môn học đang trống người đăng ký.
-2. **Khởi tạo Quota:** Chạy lệnh ở Bước 2 để thiết lập slot trong Redis.
-3. **Show high throughput:** Mở terminal chạy `python load_test/simulate.py`. Màn hình sẽ hiện log spam tốc độ phản hồi rất nhanh từ FastAPI.
-4. **Show real-time behavior:** Reload trang Frontend liên tục trong lúc test, chỉ ra rằng API FastAPI vẫn sống sót phản hồi tốt (không sập rớt) nhờ đẩy event vào Kafka.
-5. **Show Consistency (Không Race condition):** Khi tiến trình load test ngừng, mở Postgres chạy lệnh kiểm tra Group By ở Bước 5. Đối chiếu tổng số `COUNT(*)` xem có hoàn toàn bị giới hạn đúng với số slot ban đầu không (VD set 50 slot thì count Max = 50, dù có 5000 requests đồng loạt gọi vào).
-6. **Show Unique Constraint:** Thử gửi lại 1 request đăng ký với `student_id` và `course_id` đã thành công, chỉ ra việc cơ sở dữ liệu đã reject (bỏ qua) thành công duplicate record nhờ ràng buộc UNIQUE.
+### Vai trò từng thành phần
+
+| Thành phần | Vai trò |
+|------------|---------|
+| **React** | Giao diện sinh viên & admin, hiển thị danh sách môn học, form đăng ký, lịch sử |
+| **FastAPI** | API gateway: tiếp nhận request, kiểm tra quota sơ bộ, publish event vào Kafka |
+| **Kafka** | Message broker — "phễu hứng" request, tách rời producer và consumer, chịu spike tải |
+| **Spark Streaming** | Xử lý luồng nền: DECR Redis, ghi PostgreSQL, xử lý rollback khi trùng/hết chỗ |
+| **Redis** | Atomic distributed counter — đảm bảo không vượt quota dù hàng ngàn req đồng thời |
+| **PostgreSQL** | Source of truth — lưu trữ bền vững danh sách đăng ký và chỉ tiêu môn học |
+
+---
+
+## Công Nghệ Sử Dụng
+
+| Thành phần | Công nghệ | Phiên bản |
+|------------|-----------|-----------|
+| Giao diện người dùng | React | 18.2 |
+| HTTP Client | Axios | 1.x |
+| UI Components | React Bootstrap + Framer Motion | 5.3 / 12.x |
+| API Backend | FastAPI + Uvicorn | 0.100+ / 0.23+ |
+| Message Broker | Apache Kafka (Confluent) | 7.4.0 |
+| Coordination | Apache Zookeeper (Confluent) | 7.4.0 |
+| Stream Processing | Apache Spark Structured Streaming | 3.x |
+| Distributed Cache | Redis | 7 (Alpine) |
+| Cơ sở dữ liệu | PostgreSQL | 13 |
+| Kafka Client (Python) | kafka-python | 2.0.2 |
+| DB Adapter (Python) | psycopg2-binary | 2.9+ |
+| Redis Client (Python) | redis-py | 5.x |
+| Container hóa | Docker + Docker Compose | - |
+
+---
+
+## Tính Năng Chính
+
+### Sinh viên
+- **Xem danh sách học phần** — tên môn, số chỗ còn lại cập nhật real-time
+- **Đăng ký học phần** — nhận phản hồi tức thì ("Đã ghi nhận" / "Hết chỗ")
+- **Kiểm tra trạng thái** — xác nhận đăng ký thành công dựa trên dữ liệu PostgreSQL
+
+### Admin
+- **Dashboard tổng quan** — thống kê tổng số đăng ký, tỉ lệ thành công/thất bại
+- **Pipeline visualization** — theo dõi luồng dữ liệu qua từng tầng
+- **Activity feed** — nhật ký sự kiện đăng ký theo thời gian thực
+
+---
+
+## Yêu Cầu Hệ Thống
+
+| Yêu cầu | Phiên bản tối thiểu |
+|---------|---------------------|
+| Docker | 20.x trở lên |
+| Docker Compose | v2.x (tích hợp trong Docker Desktop) |
+| RAM khuyến nghị | ≥ 6 GB (Spark + Kafka + Redis chạy đồng thời) |
+| OS | Windows 10/11, macOS, Linux |
+
+> Không cần cài Python, Node.js hay Java riêng — tất cả chạy trong container.
+
+---
+
+## Hướng Dẫn Cài Đặt & Chạy
+
+Xem tài liệu đầy đủ từng bước tại **[SETUP.md](./SETUP.md)** — bao gồm khởi động hệ thống, đồng bộ Redis, kiểm thử tải, kiểm tra kết quả trong database và xem log Spark.
+
+---
+
+## Kết Quả Đạt Được
+
+Hệ thống được kiểm thử bằng `load_test/simulate.py` với nhiều luồng đồng thời tranh nhau đăng ký một môn học có chỉ tiêu cố định. Kết quả xác nhận ba tính chất cốt lõi:
+
+- **Không trùng đăng ký**: Constraint `UNIQUE(student_id, course_id)` tại PostgreSQL kết hợp cơ chế rollback Redis khi phát hiện `IntegrityError` — mọi bản ghi trùng đều bị loại bỏ và slot được hoàn trả.
+- **Không vượt chỉ tiêu**: Lệnh `DECR` trên Redis là atomic — tại bất kỳ mức tải nào, số sinh viên được ghi vào DB luôn đúng bằng chỉ tiêu của môn học, không hơn không kém.
+- **Xử lý race condition**: Spark xử lý tuần tự từng micro-batch; mọi xung đột ghi đồng thời đều được giải quyết ở tầng Redis trước khi chạm tới DB, không có write conflict.
+
+---
+
+## Cấu Trúc Thư Mục
+
+```
+Bigdata_Project/
+├── api/                    # FastAPI backend
+│   ├── main.py
+│   └── requirements.txt
+├── spark/                  # Spark Streaming job
+│   ├── job.py
+│   ├── init_redis.py
+│   └── requirements.txt
+├── frontend/               # React SPA
+│   ├── src/
+│   │   ├── pages/          # AdminDashboard, StudentPage, RoleSelectionPage
+│   │   ├── components/
+│   │   │   ├── admin/      # Header, DashboardCards, PipelineViz, ActivityFeed
+│   │   │   ├── student/    # CourseList, CourseCard, RegisterForm, RegistrationHistory
+│   │   │   └── shared/     # Layout, Loading, EmptyState, ThemeToggle
+│   │   ├── services/       # api.js — axios wrapper
+│   │   └── styles/         # global.css, theme.css, admin.css, student.css
+│   └── package.json
+├── load_test/              # Script kiểm thử chịu tải
+│   └── simulate.py
+├── init-db.sql             # Khởi tạo schema + dữ liệu mẫu PostgreSQL
+├── docker-compose.yml
+└── ARCHITECTURE.md         # Tài liệu kiến trúc chi tiết
+```
+
+---
+
+## Hướng Phát Triển
+
+| Tính năng | Mô tả |
+|-----------|-------|
+| **Waiting list** | Sinh viên hết chỗ được xếp vào hàng chờ, tự động nhận chỗ khi có người hủy |
+| **Exactly-once semantics** | Tích hợp Kafka Transactions + Spark `foreachBatch` với idempotent write |
+| **WebSocket / SSE** | Đẩy cập nhật số chỗ trống về frontend theo thời gian thực, không cần polling |
+| **Kubernetes** | Horizontal Pod Autoscaler cho API và Spark Worker, scale theo tải |
+| **Monitoring stack** | Prometheus + Grafana theo dõi lag Kafka, throughput Spark, hit rate Redis |
+| **Authentication** | JWT / OAuth2 tích hợp hệ thống SSO của trường |
+
+---
+
+## Thành Viên Nhóm
+
+> *(Cập nhật tên thành viên vào đây)*
+
+---
+
+*Đồ án Big Data — Năm 2, Học kỳ 2 · Đại học Quốc tế Sài Gòn (SIU)*

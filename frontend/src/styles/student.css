@@ -1,0 +1,269 @@
+/* ===== STUDENT PAGE LAYOUT ===== */
+
+.student-page {
+  background-color: var(--bg-dark);
+  min-height: 100vh;
+  color: var(--text-main);
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Main Container - Centered with max-width for readability */
+.student-main-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+/* Sections with consistent spacing */
+.student-section {
+  margin-bottom: 3rem;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.student-section:last-child {
+  margin-bottom: 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Course section specific spacing */
+.course-section {
+  margin-bottom: 4rem;
+}
+
+/* Registration section */
+.registration-section {
+  margin-top: 2rem;
+}
+
+/* Card wrapper with improved structure */
+.student-card-wrapper {
+  background-color: var(--card-dark);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: var(--radius-md);
+  padding: 2rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  backdrop-filter: blur(10px);
+  transition: all var(--transition-normal);
+}
+
+.student-card-wrapper:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: 0 8px 16px var(--card-shadow);
+}
+
+/* Section titles */
+.student-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 0.125rem;
+  letter-spacing: -0.01em;
+}
+
+/* ===== STUDENT HEADER ===== */
+
+.student-header {
+  background: var(--header-gradient);
+  border-bottom: 2px solid var(--header-border);
+  padding: 4rem 2rem;
+  margin-bottom: 2rem;
+  color: var(--text-main);
+}
+
+.student-header h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  letter-spacing: -0.5px;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--text-main);
+}
+
+.student-header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ===== COURSE CATALOG SECTION ===== */
+
+.course-catalog {
+  margin: 0;
+  padding: 0;
+}
+
+.course-catalog-header {
+  margin-bottom: 1.75rem;
+}
+
+.course-catalog-header h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  margin-bottom: 0.375rem;
+  color: var(--text-main);
+}
+
+.course-catalog-header p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ===== REGISTRATION HISTORY ===== */
+
+.reg-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  overflow-y: auto;
+  max-height: 380px;
+  padding-right: 2px;
+}
+
+.reg-history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  opacity: 0.55;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.reg-history-item {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  border: 1px solid var(--border-subtle);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.reg-history-item:hover {
+  background-color: var(--hover-overlay);
+  border-color: var(--border-light);
+}
+
+.reg-history-item--success {
+  background-color: rgba(34, 197, 94, 0.07);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.reg-history-item--error {
+  background-color: rgba(239, 68, 68, 0.07);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.reg-history-icon {
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.reg-history-content {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.reg-history-course {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+
+.reg-history-msg {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.reg-history-time {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.125rem;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+@media (max-width: 768px) {
+  .student-main-container {
+    padding: 2rem 1rem;
+  }
+
+  .student-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .course-section {
+    margin-bottom: 3rem;
+  }
+
+  .student-header {
+    padding: 2.5rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .student-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .student-header p {
+    font-size: 0.95rem;
+  }
+
+  .student-card-wrapper {
+    padding: 1.5rem;
+  }
+
+  .registration-section .row {
+    flex-direction: column-reverse;
+  }
+}
+
+@media (max-width: 576px) {
+  .student-main-container {
+    padding: 1.5rem 0.75rem;
+  }
+
+  .student-section {
+    margin-bottom: 2rem;
+  }
+
+  .student-header {
+    padding: 2rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .student-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .student-card-wrapper {
+    padding: 1.25rem;
+  }
+
+  .student-section-title {
+    font-size: 1.1rem;
+  }
+}
