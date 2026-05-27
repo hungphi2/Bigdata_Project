@@ -21,24 +21,33 @@ Hệ thống mô phỏng bài toán thực tế tại các trường đại họ
 ## Kiến Trúc Tổng Thể
 
 ```
-┌──────────┐   HTTP POST    ┌───────────┐   Produce   ┌──────────────────────┐
-│          │ ─────────────► │           │ ───────────► │  Kafka               │
-│  React   │                │  FastAPI  │              │  topic: registrations│
-│ Frontend │ ◄───────────── │  Backend  │              └──────────┬───────────┘
-│ (Port    │  "Đã ghi nhận" │ (Port     │                         │ Consume
-│  3000)   │                │  8000)    │                         ▼
-└──────────┘                │           │   Check     ┌──────────────────────┐
-                            │           │ ──────────► │  Redis               │
-                            └───────────┘   Quota     │  quota:<course_id>   │
-                                  ▲                   └──────────┬───────────┘
-                                  │ GET /check                   │ DECR (atomic)
-                                  │                              ▼
-                            ┌─────┴─────┐  INSERT    ┌──────────────────────┐
-                            │           │ ──────────► │  Apache Spark        │
-                            │ PostgreSQL│             │  Structured Streaming│
-                            │  (Port    │ ◄────────── │  (job.py)            │
-                            │   5432)   │   Persist   └──────────────────────┘
-                            └───────────┘
+┌──────────┐   HTTP POST    ┌───────────────────────────────────────────────┐
+│          │ ─────────────► │  FastAPI Backend (Port 8000)                  │
+│  React   │                │                                               │
+│ Frontend │ ◄───────────── │  1. DECR quota:<course_id> trên Redis         │
+│ (Port    │  "Đã ghi nhận" │     ├─ remaining < 0 → INCR (hoàn) → Lỗi 400 │
+│  3000)   │   hoặc lỗi     │     └─ remaining ≥ 0 → Publish Kafka          │
+└──────────┘                └───────┬───────────────────────┬───────────────┘
+     │ GET /check                   │ Produce               │ DECR/INCR
+     ▼                              ▼                       ▼
+┌──────────┐              ┌──────────────────┐   ┌──────────────────────┐
+│          │              │  Kafka           │   │  Redis               │
+│PostgreSQL│              │  topic:          │   │  quota:<course_id>   │
+│ (Port    │              │  registrations   │   └──────────────────────┘
+│  5432)   │              └────────┬─────────┘
+│          │                       │ Consume
+│          │ ◄─────────────────────┤
+│          │   INSERT / log event  │
+└──────────┘                       ▼
+                          ┌──────────────────────┐
+                          │  Apache Spark        │
+                          │  Structured Streaming│
+                          │  (job.py)            │
+                          │                      │
+                          │  INSERT → PostgreSQL │
+                          │  IntegrityError →    │
+                          │    INCR Redis (hoàn) │
+                          └──────────────────────┘
 ```
 
 ### Luồng xử lý chính
@@ -47,16 +56,16 @@ Hệ thống mô phỏng bài toán thực tế tại các trường đại họ
 [1] Sinh viên bấm "Đăng ký"
         │
         ▼
-[2] FastAPI kiểm tra Redis quota (nhanh, in-memory)
-    ├─ Hết chỗ → Trả lỗi ngay
-    └─ Còn chỗ → Đẩy event vào Kafka → Trả "Đã ghi nhận"
+[2] FastAPI nhận request — xử lý tại tầng API
+    ├─ DECR quota trên Redis (atomic, in-memory)
+    │   ├─ remaining < 0 → INCR Redis (hoàn slot) → Trả lỗi 400 "Hết chỗ"
+    │   └─ remaining ≥ 0 → Publish event vào Kafka → Trả "Đã ghi nhận"
         │
         ▼
 [3] Spark Streaming tiêu thụ event từ Kafka
-    ├─ DECR quota trên Redis (atomic, thread-safe)
-    │   ├─ remaining >= 0 → INSERT vào PostgreSQL
-    │   │   └─ Trùng (IntegrityError) → INCR Redis (hoàn slot)
-    │   └─ remaining < 0  → INCR Redis (hoàn slot), bỏ qua
+    ├─ INSERT vào PostgreSQL
+    │   ├─ Thành công → Ghi log success, tăng metrics
+    │   └─ IntegrityError (trùng đăng ký) → Rollback + INCR Redis (hoàn slot) + Ghi log failed
         │
         ▼
 [4] Frontend gọi GET /check → API truy vấn PostgreSQL
@@ -68,10 +77,10 @@ Hệ thống mô phỏng bài toán thực tế tại các trường đại họ
 | Thành phần | Vai trò |
 |------------|---------|
 | **React** | Giao diện sinh viên & admin, hiển thị danh sách môn học, form đăng ký, lịch sử |
-| **FastAPI** | API gateway: tiếp nhận request, kiểm tra quota sơ bộ, publish event vào Kafka |
+| **FastAPI** | API gateway: tiếp nhận request, **DECR Redis atomically** để giữ slot, publish event vào Kafka, trả kết quả tức thì |
 | **Kafka** | Message broker — "phễu hứng" request, tách rời producer và consumer, chịu spike tải |
-| **Spark Streaming** | Xử lý luồng nền: DECR Redis, ghi PostgreSQL, xử lý rollback khi trùng/hết chỗ |
-| **Redis** | Atomic distributed counter — đảm bảo không vượt quota dù hàng ngàn req đồng thời |
+| **Spark Streaming** | Xử lý luồng nền: đọc event từ Kafka, **INSERT vào PostgreSQL**; nếu trùng (`IntegrityError`) thì INCR Redis hoàn slot |
+| **Redis** | Atomic distributed counter — DECR tại tầng API đảm bảo không vượt quota dù hàng ngàn req đồng thời |
 | **PostgreSQL** | Source of truth — lưu trữ bền vững danh sách đăng ký và chỉ tiêu môn học |
 
 ---
@@ -82,7 +91,10 @@ Hệ thống mô phỏng bài toán thực tế tại các trường đại họ
 |------------|-----------|-----------|
 | Giao diện người dùng | React | 18.2 |
 | HTTP Client | Axios | 1.x |
-| UI Components | React Bootstrap + Framer Motion | 5.3 / 12.x |
+| UI Components | React Bootstrap + Framer Motion | 2.10 / 12.x |
+| Icon Set | React Icons | 5.x |
+| Thông báo | React Toastify | 11.x |
+| Điều hướng | React Router DOM | 7.x |
 | API Backend | FastAPI + Uvicorn | 0.100+ / 0.23+ |
 | Message Broker | Apache Kafka (Confluent) | 7.4.0 |
 | Coordination | Apache Zookeeper (Confluent) | 7.4.0 |
@@ -145,21 +157,28 @@ Hệ thống được kiểm thử bằng `load_test/simulate.py` với nhiều 
 Bigdata_Project/
 ├── api/                    # FastAPI backend
 │   ├── main.py
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── Dockerfile
 ├── spark/                  # Spark Streaming job
 │   ├── job.py
 │   ├── init_redis.py
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── Dockerfile
 ├── frontend/               # React SPA
 │   ├── src/
+│   │   ├── App.jsx
+│   │   ├── index.jsx
 │   │   ├── pages/          # AdminDashboard, StudentPage, RoleSelectionPage
 │   │   ├── components/
-│   │   │   ├── admin/      # Header, DashboardCards, PipelineViz, ActivityFeed
-│   │   │   ├── student/    # CourseList, CourseCard, RegisterForm, RegistrationHistory
+│   │   │   ├── admin/      # AdminHeader, Header, DashboardCards, PipelineViz, ActivityFeed
+│   │   │   ├── student/    # StudentHeader, CourseList, CourseCard, RegisterForm, RegistrationHistory
 │   │   │   └── shared/     # Layout, Loading, EmptyState, ThemeToggle
+│   │   ├── contexts/       # ThemeContext.jsx — quản lý light/dark mode
 │   │   ├── services/       # api.js — axios wrapper
 │   │   └── styles/         # global.css, theme.css, admin.css, student.css
-│   └── package.json
+│   ├── nginx.conf
+│   ├── package.json
+│   └── Dockerfile
 ├── load_test/              # Script kiểm thử chịu tải
 │   └── simulate.py
 ├── init-db.sql             # Khởi tạo schema + dữ liệu mẫu PostgreSQL
