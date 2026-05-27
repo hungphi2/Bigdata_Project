@@ -15,3 +15,9 @@ export const checkRegistration = (studentId, courseId) =>
 
 export const getCourses = () =>
   axios.get(`${API_BASE}/courses`);
+
+export const getMetrics = () =>
+  axios.get(`${API_BASE}/metrics`);
+
+export const getEvents = (limit = 20) =>
+  axios.get(`${API_BASE}/events`, { params: { limit } });

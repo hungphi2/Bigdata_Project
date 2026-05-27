@@ -15,8 +15,8 @@ function StudentPage() {
   const { theme } = useTheme();
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
+  const [registrations, setRegistrations] = useState([]);
   const [pendingChecks, setPendingChecks] = useState([]);
-  const [activities, setActivities] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
 
   const fetchCourses = async () => {
@@ -36,6 +36,7 @@ function StudentPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Poll pending registrations and update their status once confirmed
   useEffect(() => {
     if (pendingChecks.length === 0) return;
     const interval = setInterval(async () => {
@@ -43,15 +44,16 @@ function StudentPage() {
         try {
           const res = await checkRegistration(req.studentId, req.courseId);
           if (res.data && res.data.registered) {
-            setPendingChecks(prev => prev.filter(p => !(p.studentId === req.studentId && p.courseId === req.courseId)));
-            setActivities(prev => [{
-              id: Date.now() + Math.random(),
-              studentId: req.studentId,
-              courseId: req.courseId,
-              status: 'success',
-              reason: 'Registered Successfully',
-              timestamp: new Date().toISOString()
-            }, ...prev]);
+            setPendingChecks(prev =>
+              prev.filter(p => p.id !== req.id)
+            );
+            setRegistrations(prev =>
+              prev.map(r =>
+                r.id === req.id
+                  ? { ...r, status: 'success', reason: 'Registered Successfully' }
+                  : r
+              )
+            );
           }
         } catch (error) {
           console.error('Check registration error:', error);
@@ -61,18 +63,28 @@ function StudentPage() {
     return () => clearInterval(interval);
   }, [pendingChecks]);
 
+  // Called by RegisterForm on successful HTTP submit → add PENDING entry immediately
   const handleRegisterSuccess = (studentId, courseId) => {
-    setPendingChecks(prev => [...prev, { studentId, courseId }]);
+    const id = Date.now() + Math.random();
+    setRegistrations(prev => [{
+      id,
+      studentId,
+      courseId,
+      status: 'pending',
+      reason: 'Processing…',
+      timestamp: new Date().toISOString()
+    }, ...prev]);
+    setPendingChecks(prev => [...prev, { id, studentId, courseId }]);
   };
 
+  // Called by RegisterForm on HTTP error → add FAILED entry immediately
   const handleRegisterError = (studentId, courseId, message) => {
-    console.error(`Registration failed for ${studentId}: ${message}`);
-    setActivities(prev => [{
+    setRegistrations(prev => [{
       id: Date.now() + Math.random(),
-      studentId: studentId,
-      courseId: courseId,
+      studentId,
+      courseId,
       status: 'failed',
-      reason: message || 'Failed',
+      reason: message || 'Registration failed',
       timestamp: new Date().toISOString()
     }, ...prev]);
   };
@@ -83,25 +95,25 @@ function StudentPage() {
 
   return (
     <div className="student-page">
-      {/* Header Section */}
       <StudentHeader />
-      
-      {/* Main Content Container - Centered with max-width */}
+
       <Container className="student-main-container">
-        {/* Course Catalog Section */}
         <section className="student-section course-section">
-          <CourseList courses={courses} onSelectCourse={handleSelectCourse} loading={coursesLoading} />
+          <CourseList
+            courses={courses}
+            onSelectCourse={handleSelectCourse}
+            loading={coursesLoading}
+          />
         </section>
 
-        {/* Registration & History Section */}
         <section className="student-section registration-section">
           <Row className="g-4">
             <Col lg={6} className="d-flex flex-column">
               <div className="student-card-wrapper">
                 <h3 className="student-section-title">Register for Course</h3>
-                <RegisterForm 
-                  courses={courses} 
-                  onRegisterSuccess={handleRegisterSuccess} 
+                <RegisterForm
+                  courses={courses}
+                  onRegisterSuccess={handleRegisterSuccess}
                   onRegisterError={handleRegisterError}
                   selectedCourseId={selectedCourseId}
                 />
@@ -110,7 +122,7 @@ function StudentPage() {
             <Col lg={6} className="d-flex flex-column">
               <div className="student-card-wrapper">
                 <h3 className="student-section-title">Registration Activity</h3>
-                <RegistrationHistory activities={activities} />
+                <RegistrationHistory registrations={registrations} />
               </div>
             </Col>
           </Row>

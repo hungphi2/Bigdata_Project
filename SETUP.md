@@ -62,15 +62,17 @@ docker compose up --build -d
 
 Lệnh này sẽ build image và khởi động **7 service** theo thứ tự phụ thuộc:
 
-| Service | Vai trò | Port |
-|---------|---------|------|
-| `zookeeper` | Điều phối cluster Kafka | *(nội bộ)* |
-| `kafka` | Message broker nhận event đăng ký | `9092` |
-| `redis` | Atomic counter lưu quota môn học | `6379` |
-| `postgres` | Cơ sở dữ liệu bền vững | `5432` |
-| `api` | FastAPI backend | `8000` |
-| `spark` | Spark Streaming job xử lý nền | *(nội bộ)* |
-| `frontend` | Giao diện React | `3000` |
+
+| Service     | Vai trò                           | Port       |
+| ----------- | --------------------------------- | ---------- |
+| `zookeeper` | Điều phối cluster Kafka           | *(nội bộ)* |
+| `kafka`     | Message broker nhận event đăng ký | `9092`     |
+| `redis`     | Atomic counter lưu quota môn học  | `6379`     |
+| `postgres`  | Cơ sở dữ liệu bền vững            | `5432`     |
+| `api`       | FastAPI backend                   | `8000`     |
+| `spark`     | Spark Streaming job xử lý nền     | *(nội bộ)* |
+| `frontend`  | Giao diện React                   | `3000`     |
+
 
 Theo dõi tiến trình khởi động:
 
@@ -102,17 +104,17 @@ docker compose ps
 Chạy script bên trong container `spark`:
 
 ```bash
-docker compose exec spark python init_redis.py
+docker compose exec spark python3 /opt/spark/init_redis.py
 ```
 
 Xác minh Redis đã có dữ liệu (tuỳ chọn):
 
 ```bash
 docker compose exec redis redis-cli GET quota:CS101
-# Kết quả mong đợi: "50"
+# Kết quả mong đợi: số quota tương ứng đã cấu hình trong init-db.sql
 
 docker compose exec redis redis-cli GET quota:CS102
-# Kết quả mong đợi: "30"
+# Kết quả mong đợi: số quota tương ứng đã cấu hình trong init-db.sql
 ```
 
 ---
@@ -121,12 +123,15 @@ docker compose exec redis redis-cli GET quota:CS102
 
 Mở trình duyệt và truy cập:
 
-| Địa chỉ | Mô tả |
-|---------|-------|
-| **http://localhost:3000** | Giao diện chính (chọn vai trò Sinh viên / Admin) |
-| **http://localhost:8000/docs** | Swagger UI — tài liệu và thử nghiệm API trực tiếp |
+
+| Địa chỉ                                                      | Mô tả                                             |
+| ------------------------------------------------------------ | ------------------------------------------------- |
+| **[http://localhost:3000](http://localhost:3000)**           | Giao diện chính (chọn vai trò Sinh viên / Admin)  |
+| **[http://localhost:8000/docs](http://localhost:8000/docs)** | Swagger UI — tài liệu và thử nghiệm API trực tiếp |
+
 
 Trên giao diện sinh viên, bạn có thể:
+
 - Xem danh sách môn học cùng số chỗ còn lại
 - Nhập mã sinh viên và đăng ký môn học
 - Kiểm tra trạng thái đăng ký
@@ -163,60 +168,40 @@ python load_test/simulate.py
 ### Kết quả mong đợi
 
 ```
-Total: 5000, accepted: <số request được API nhận>
+Total: <NUM_REQUESTS>, accepted: <số request được API nhận>
 ```
 
-> Script mặc định gửi **5 000 request** với **100 luồng đồng thời** nhắm vào `CS101` (50 chỗ) và `CS102` (30 chỗ). Sau khi test xong, kiểm tra DB ở Bước 7 để xác nhận tính đúng đắn.
+> `NUM_REQUESTS` và `CONCURRENCY` được cấu hình trực tiếp trong `load_test/simulate.py`. Sau khi test xong, kiểm tra DB ở Bước 7 để xác nhận tính đúng đắn.
 
 ---
 
 ## Bước 7 — Kiểm Tra Kết Quả Trong Database
 
-Kết nối vào container PostgreSQL:
-
-```bash
-docker compose exec postgres psql -U admin -d registration
-```
+Chạy trực tiếp từ terminal mà không cần vào psql:
 
 ### Kiểm tra tổng số đăng ký thành công theo từng môn
 
-```sql
-SELECT course_id, COUNT(*) AS total_registered
-FROM registrations
-GROUP BY course_id
-ORDER BY course_id;
+```bash
+docker compose exec postgres psql -U admin -d registration -c \
+  "SELECT course_id, COUNT(*) AS total_registered FROM registrations GROUP BY course_id ORDER BY course_id;"
 ```
 
-Kết quả đúng: số lượng ≤ `total_quota` của từng môn (`CS101` ≤ 50, `CS102` ≤ 30).
+Kết quả đúng: `total_registered` của mỗi môn ≤ `total_quota` đã cấu hình trong `init-db.sql`.
 
 ### Kiểm tra không có đăng ký trùng
 
-```sql
-SELECT student_id, course_id, COUNT(*) AS cnt
-FROM registrations
-GROUP BY student_id, course_id
-HAVING COUNT(*) > 1;
+```bash
+docker compose exec postgres psql -U admin -d registration -c \
+  "SELECT student_id, course_id, COUNT(*) AS cnt FROM registrations GROUP BY student_id, course_id HAVING COUNT(*) > 1;"
 ```
 
 Kết quả đúng: **không có hàng nào trả về** — mỗi cặp `(student_id, course_id)` là duy nhất.
 
 ### Kiểm tra quota còn lại so với số đã đăng ký
 
-```sql
-SELECT
-    q.course_id,
-    q.total_quota,
-    COUNT(r.id)            AS registered,
-    q.total_quota - COUNT(r.id) AS remaining_calc
-FROM course_quota q
-LEFT JOIN registrations r ON q.course_id = r.course_id
-GROUP BY q.course_id, q.total_quota;
-```
-
-Thoát khỏi psql:
-
-```sql
-\q
+```bash
+docker compose exec postgres psql -U admin -d registration -c \
+  "SELECT q.course_id, q.total_quota, COUNT(r.id) AS registered, q.total_quota - COUNT(r.id) AS remaining_calc FROM course_quota q LEFT JOIN registrations r ON q.course_id = r.course_id GROUP BY q.course_id, q.total_quota ORDER BY q.course_id;"
 ```
 
 ---
@@ -280,7 +265,7 @@ docker compose down -v
 docker compose up --build -d
 
 # 2. Đồng bộ quota vào Redis (chỉ chạy 1 lần sau khi postgres sẵn sàng)
-docker compose exec spark python init_redis.py
+docker compose exec spark python3 /opt/spark/init_redis.py
 
 # 3. Mở trình duyệt
 #    http://localhost:3000       ← Giao diện

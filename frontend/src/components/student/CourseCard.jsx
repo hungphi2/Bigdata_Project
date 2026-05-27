@@ -3,9 +3,9 @@ import { Badge } from 'react-bootstrap';
 import { FiBook, FiUsers } from 'react-icons/fi';
 
 const CourseCard = ({ course, onSelectCourse }) => {
-  const enrolled   = course.total_quota - course.remaining;
+  const enrolled   = Math.max(0, course.total_quota - course.remaining);
   const percentage = (enrolled / course.total_quota) * 100;
-  const isFull     = course.remaining === 0;
+  const isFull     = course.remaining <= 0;
   const fillColor  = isFull ? 'var(--danger)' : percentage > 70 ? 'var(--warning)' : 'var(--primary)';
 
   return (
