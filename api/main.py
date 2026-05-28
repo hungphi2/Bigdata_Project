@@ -1,6 +1,6 @@
 ﻿from fastapi import (
-    FastAPI,
-    HTTPException
+   FastAPI,
+   HTTPException
 )
 
 from fastapi.middleware.cors import (
@@ -128,10 +128,10 @@ def startup_event():
         try:
             _db_pool = pg_pool.ThreadedConnectionPool(
                 minconn=2,
-                maxconn=3,   # 8 workers × 3 = 24 total connections max
+                maxconn=10,  # 8 workers × 10 = 80 total connections max (< postgres 200)
                 **_DB_KWARGS
             )
-            print("DB connection pool initialized (min=2 max=5)")
+            print("DB connection pool initialized (min=2 max=10)")
             break
         except Exception as e:
             print(f"Waiting for Postgres... ({i+1}/30): {e}")

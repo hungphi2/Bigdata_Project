@@ -243,8 +243,23 @@ def run_phase2(concurrency):
 # Phase 3: DB commit verification via /metrics
 # ---------------------------------------------------------------------------
 
-def run_metrics_check(kafka_accepted, wait_sec=SPARK_FLUSH_WAIT_SEC):
-    """Poll /metrics until Spark has flushed all batches, then verify."""
+def get_metrics_baseline():
+    """Snapshot DB counters before the test run to enable delta comparison."""
+    try:
+        resp = requests.get(f"{BASE_URL}/metrics", timeout=10)
+        m    = resp.json()
+        return m.get("successful", 0), m.get("failed", 0)
+    except Exception as e:
+        print(f"[METRICS] Warning: could not fetch baseline metrics: {e}")
+        return 0, 0
+
+
+def run_metrics_check(kafka_accepted, baseline_ok=0, baseline_fail=0, wait_sec=SPARK_FLUSH_WAIT_SEC):
+    """Poll /metrics until Spark has flushed all batches, then verify.
+
+    Uses delta against baseline to ignore records from previous runs or
+    manual registrations that existed before this test started.
+    """
     print()
     print(f"[METRICS] Waiting {wait_sec}s for Spark to flush remaining batches...")
     time.sleep(wait_sec)
@@ -254,25 +269,30 @@ def run_metrics_check(kafka_accepted, wait_sec=SPARK_FLUSH_WAIT_SEC):
             resp = requests.get(f"{BASE_URL}/metrics", timeout=10)
             m    = resp.json()
 
-            db_ok   = m.get("successful", 0)
-            db_fail = m.get("failed", 0)
-            quota   = m.get("totalQuotaLeft", "?")
+            db_ok_total   = m.get("successful", 0)
+            db_fail_total = m.get("failed", 0)
+            quota         = m.get("totalQuotaLeft", "?")
 
-            over_quota = db_ok > kafka_accepted
+            # Delta: only count records written during this test run
+            delta_ok   = db_ok_total   - baseline_ok
+            delta_fail = db_fail_total - baseline_fail
+
+            over_quota = delta_ok > kafka_accepted
+            match      = delta_ok == kafka_accepted
 
             print()
             print("=" * 40)
             print("PHASE 3 — DB COMMIT VERIFICATION (/metrics)")
             print("=" * 40)
             print(f"Kafka accepted (HTTP 200) : {kafka_accepted}")
-            print(f"DB successful commits     : {db_ok}")
-            print(f"DB failed events          : {db_fail}")
+            print(f"DB successful (this run)  : {delta_ok}  (total all-time: {db_ok_total})")
+            print(f"DB failed     (this run)  : {delta_fail}  (total all-time: {db_fail_total})")
             print(f"Quota remaining (all)     : {quota}")
             print(f"Over-quota?  : {'NO  ✓' if not over_quota else 'YES ✗  ← BUG!'}")
-            print(f"Kafka→DB match? : {'YES ✓' if db_ok == kafka_accepted else f'NOT YET — Spark still processing (attempt {attempt}/3)'}")
+            print(f"Kafka→DB match? : {'YES ✓' if match else f'NOT YET — Spark still processing (attempt {attempt}/3)'}")
             print("=" * 40)
 
-            if db_ok == kafka_accepted:
+            if match:
                 break
             if attempt < 3:
                 print(f"[METRICS] Retrying in 5s...")
@@ -292,6 +312,8 @@ if __name__ == "__main__":
     CONCURRENCY  = prompt_int("Enter concurrent workers", DEFAULT_CONCURRENCY)
     print()
 
+    baseline_ok, baseline_fail = get_metrics_baseline()
+
     kafka_accepted = run_phase1(NUM_REQUESTS, CONCURRENCY)
     run_phase2(CONCURRENCY)
-    run_metrics_check(kafka_accepted)
+    run_metrics_check(kafka_accepted, baseline_ok, baseline_fail)
